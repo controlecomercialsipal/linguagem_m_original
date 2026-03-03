@@ -1,0 +1,38 @@
+let
+    Fonte = Excel.Workbook(Web.Contents("https://gruposipal.sharepoint.com/sites/ControladoriaComercial/Documentos%20Compartilhados/Restrita/02%20-%20Execu%C3%A7%C3%A3o%20Comercial%20%E2%80%93%20Compras/CONTRATOS%20DE%20COMPRAS/Contratos%20anexar%20MERX/BI_Contratos/Contratos.xlsx null, true),
+    Base_Editada_Table = Fonte{[Item="Base_Editada",Kind="Table"]}[Data],
+    #"Tipo Alterado" = Table.TransformColumnTypes(Base_Editada_Table,{{"Contrato", type text}, {"Status", type text}, {"Produtor", Int64.Type}, {"Emissor", type text}, {"Produto", type text}, {"Quantidade negociada", Int64.Type}, {"Moeda", type text}, {"Local de entrega", Int64.Type}, {"Data inicial da entrega (UTC)", type datetime}, {"Data final da entrega (UTC)", type datetime}, {"Safra", type text}, {"Modalidade", type text}, {"Data de pagamento (UTC)", type datetime}, {"Tipo de pagamento", type text}, {"Tipo de negociação", type text}, {"Data do pedido (UTC)", type datetime}, {"Preço unitário", type number}, {"Unidade de medida", type text}, {"Modalidade de frete", type text}, {"Cidade de entrega", type text}, {"Estado de entrega", type text}, {"Descrição", type text}, {"Código da carteira", Int64.Type}, {"ID MerX", type text}, {"Cancelado", Int64.Type}, {"Status Integração", Int64.Type}, {"Mensagem Integração", type text}, {"Data/Hora Integração", Int64.Type}, {"ESCRITÓRIO ID NEGOCIADOR", type text}, {"ID - Escirtório", type text}}),
+    #"Tipo Alterado1" = Table.TransformColumnTypes(#"Tipo Alterado",{{"Produtor", type text}, {"Local de entrega", type text}, {"Cancelado", type text}}),
+    #"Colunas Removidas" = Table.RemoveColumns(#"Tipo Alterado1",{"Cancelado", "ESCRITÓRIO ID NEGOCIADOR", "Mensagem Integração"}),
+    #"Tipo Alterado2" = Table.TransformColumnTypes(#"Colunas Removidas",{{"Data/Hora Integração", type number}}),
+    #"Colunas Removidas1" = Table.RemoveColumns(#"Tipo Alterado2",{"ID MerX"}),
+    #"Personalização Adicionada" = Table.AddColumn(#"Colunas Removidas1", "Personalizar", each if [#"Data do pedido (UTC)"] = null then
+    null
+else
+    Duration.Days(
+        Date.From(DateTimeZone.UtcNow()) 
+        - Date.From([#"Data do pedido (UTC)"])
+    )),
+    #"Colunas Renomeadas" = Table.RenameColumns(#"Personalização Adicionada",{{"Personalizar", "Dias desde a Emissão do contrato"}}),
+    #"Personalização Adicionada1" = Table.AddColumn(#"Colunas Renomeadas", "Personalizar", each let d = [#"Dias desde a Emissão do contrato"] in
+if d = null then "Sem data"
+else if d <= 5 then "Verde"
+else if d <= 10 then "Amarelo"
+else "Vermelho"),
+    #"Colunas Renomeadas1" = Table.RenameColumns(#"Personalização Adicionada1",{{"Personalizar", "Semáforo"}}),
+    #"Personalização Adicionada2" = Table.AddColumn(#"Colunas Renomeadas1", "Personalizar", each if [#"Dias desde a Emissão do contrato"] = null then
+    null
+else if [#"Dias desde a Emissão do contrato"] > 20 then
+    ">20"
+else
+    "≤20"),
+    #"Colunas Renomeadas2" = Table.RenameColumns(#"Personalização Adicionada2",{{"Personalizar", "Filiais com 20 dias mais"}}),
+    #"Valor Substituído" = Table.ReplaceValue(#"Colunas Renomeadas2",null,"Contratos Sem ID Negociador",Replacer.ReplaceValue,{"ID - Escirtório"}),
+    #"Tipo Alterado3" = Table.TransformColumnTypes(#"Valor Substituído",{{"Dias desde a Emissão do contrato", Int64.Type}}),
+    #"Consultas Mescladas" = Table.NestedJoin(#"Tipo Alterado3", {"Contrato"}, Base_contratos_SAP, {"Contrato"}, "Base_contratos_SAP", JoinKind.LeftOuter),
+    #"Base_contratos_SAP Expandido" = Table.ExpandTableColumn(#"Consultas Mescladas", "Base_contratos_SAP", {"Contraparte"}, {"Contraparte"}),
+    #"Colunas Renomeadas3" = Table.RenameColumns(#"Base_contratos_SAP Expandido",{{"Contraparte", "Cliente"}}),
+    #"Tipo Alterado4" = Table.TransformColumnTypes(#"Colunas Renomeadas3",{{"Quantidade negociada", type number}}),
+    #"Texto em Maiúscula" = Table.TransformColumns(#"Tipo Alterado4",{{"ID - Escirtório", Text.Upper, type text}})
+in
+    #"Texto em Maiúscula"
