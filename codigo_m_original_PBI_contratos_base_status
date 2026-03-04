@@ -1,0 +1,16 @@
+let
+    Fonte = Excel.Workbook(
+    Web.Contents(
+        "https://gruposipal.sharepoint.com/sites/ControladoriaComercial/Documentos%20Compartilhados/Restrita/02%20-%20Execução%20Comercial%20–%20Compras/CONTRATOS%20DE%20COMPRAS/Contratos%20anexar%20MERX/BI_Contratos/CONTROLE%20DE%20CONTRATOS%202026.xlsx"
+    ),
+    null,
+    true
+),
+    #"Base Status_Sheet" = Fonte{[Item="Base Status",Kind="Sheet"]}[Data],
+    #"Cabeçalhos Promovidos" = Table.PromoteHeaders(#"Base Status_Sheet", [PromoteAllScalars=true]),
+    #"Tipo Alterado" = Table.TransformColumnTypes(#"Cabeçalhos Promovidos",{{"Contrato", Int64.Type}, {"Coluna1", type text}, {"Produtor", type text}, {"Produto", type text}, {"Quantidade negociada", Int64.Type}, {"Moeda", type text}, {"Local de entrega", Int64.Type}, {"Data inicial da entrega (UTC)", Int64.Type}, {"Data final da entrega (UTC)", Int64.Type}, {"Safra", type text}, {"Data do pedido (UTC)", Int64.Type}, {"Descrição", type text}, {"Código da carteira", Int64.Type}}),
+    #"Tipo Alterado1" = Table.TransformColumnTypes(#"Tipo Alterado",{{"Contrato", type text}, {"Código da carteira", type text}}),
+    #"Consultas Mescladas" = Table.NestedJoin(#"Tipo Alterado1", {"Código da carteira"}, #"(ID NEGOCIADOR -  REPRESENTANTES)", {"CÓD."}, "(ID NEGOCIADOR -  REPRESENTANTES)", JoinKind.LeftOuter),
+    #"(ID NEGOCIADOR -  REPRESENTANTES) Expandido" = Table.ExpandTableColumn(#"Consultas Mescladas", "(ID NEGOCIADOR -  REPRESENTANTES)", {"Filial"}, {"Filial"})
+in
+    #"(ID NEGOCIADOR -  REPRESENTANTES) Expandido"
